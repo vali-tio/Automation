@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Editor Dokumen – Mobile</title>
+   <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    :root{--bg:#0f172a;--card:#111827;--muted:#94a3b8;--accent:#22c55e;--text:#e5e7eb}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Noto Sans",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:900px;margin:0 auto;padding:16px}
+    .title{font-weight:800;font-size:20px;margin:8px 0 2px}
+    .subtitle{color:var(--muted);font-size:13px;margin-bottom:16px}
+    .grid{display:grid;gap:12px}
+    @media(min-width:700px){.grid{grid-template-columns:repeat(2,1fr)}}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+    .card h2{font-size:16px;margin:0 0 8px}
+    label{font-size:13px;color:var(--muted)}
+    input[type=file],input[type=text],button,select{width:100%;margin-top:8px}
+    input[type=text],select{background:#0b1220;color:var(--text);border:1px solid #22304a;border-radius:12px;padding:10px}
+    button{background:var(--accent);color:#062a12;border:none;border-radius:12px;padding:12px 14px;font-weight:700}
+    button:disabled{opacity:.5}
+    .row{display:flex;gap:8px;align-items:center}
+    .row>div{flex:1}
+    .hint{font-size:12px;color:var(--muted);margin-top:6px}
+    .out{margin-top:20px;display:flex;gap:8px;flex-wrap:wrap}
+    .pill{background:#0b1220;border:1px dashed #344055;color:#a7b7d6;padding:8px 10px;border-radius:999px;font-size:12px}
+    .footer{margin:24px 0 60px;color:#7e8aa6;font-size:12px}
+    canvas.signature{background:white;border-radius:12px;border:1px solid #cbd5e1;touch-action:none}
+    .mini{font-size:11px;color:#9aa8c4}
+    .success{color:#22c55e}
+    .danger{color:#ef4444}
+    .position-controls {margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;}
+    .position-controls label {font-size: 12px;}
+    .preview-container {margin-top: 15px; border: 1px solid #344055; border-radius: 8px; padding: 10px; background: #0b1220;}
+    .preview-title {font-size: 13px; margin-bottom: 8px; color: var(--muted);}
+  </style>
+  <!-- pdf-lib untuk manipulasi PDF (CDN) -->
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+<footer id="donateFooter">
+  <span>Gratis untuk semua</span>
+  <a href="https://saweria.co/valitio" target="_blank" rel="noopener noreferrer">
+    💝 Dukung via Saweria
+  </a>
+</footer>
+
+<style>
+  #donateFooter {
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    z-index: 999;
+  }
+  #donateFooter a {
+    color: #f97316;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  #donateFooter a:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<body>
+  <div class="wrap">
+    <div class="title">Editor Dokumen – (Mobile)</div>
+    <div class="subtitle">Fitur ringan yang paling sering dipakai di kantor & sekolah: gabung PDF, ekstrak halaman, ubah gambar → PDF, tambahkan teks/ttd, dan kirim via WhatsApp. Semua proses di perangkat (tanpa API key).</div>
+
+    <div class="grid">
+      <!-- MERGE PDF -->
+      <section class="card">
+        <h2>1) Gabung Beberapa PDF → Satu PDF</h2>
+        <label>Pilih beberapa file PDF (urutkan sesuai nama/urutan pilih)</label>
+        <input id="mergeFiles" type="file" accept="application/pdf" multiple>
+        <button id="btnMerge">Gabungkan</button>
+        <div class="hint">Tips: pilih file bertahap sesuai urutan. Hasil akan bernama <b>merged.pdf</b>.</div>
+      </section>
+
+      <!-- EXTRACT PAGES -->
+      <section class="card">
+        <h2>2) Ekstrak Halaman Tertentu</h2>
+        <label>File PDF</label>
+        <input id="extractFile" type="file" accept="application/pdf">
+        <label>Halaman (contoh: 1,2,5-7)</label>
+        <input id="range" type="text" placeholder="1-3,5">
+        <button id="btnExtract">Ekstrak</button>
+        <div class="hint">Nomor halaman mulai dari 1.</div>
+      </section>
+
+      <!-- IMAGES TO PDF -->
+      <section class="card">
+        <h2>3) Gambar → PDF (Scan Sederhana)</h2>
+        <label>Pilih 1 atau lebih gambar (JPG/PNG)</label>
+        <input id="imgFiles" type="file" accept="image/*" multiple>
+        <label>Ukuran Kertas</label>
+        <select id="paper">
+          <option value="A4">A4 (210×297 mm)</option>
+          <option value="Letter">Letter (8.5×11 in)</option>
+        </select>
+        <label>Orientasi</label>
+        <select id="orient">
+          <option value="portrait">Potret</option>
+          <option value="landscape">Lanskap</option>
+        </select>
+        <button id="btnImg2Pdf">Buat PDF</button>
+        <div class="hint">Gambar akan di-fit ke halaman dengan margin kecil.</div>
+      </section>
+
+      <!-- ADD TEXT / SIGNATURE -->
+      <section class="card">
+        <h2>4) Tambah Teks / Tanda Tangan</h2>
+        <label>File PDF</label>
+        <input id="annotFile" type="file" accept="application/pdf">
+        <label>Teks (opsional)</label>
+        <input id="txtAnnot" type="text" placeholder="Nama, tanggal, stempel, dll">
+        <div class="hint mini">Teks ditempatkan sesuai posisi yang dipilih.</div>
+        
+        <div style="margin-top:10px">
+          <label>Tanda tangan (gambar coret di bawah ini, opsional)</label>
+          <canvas id="signPad" class="signature" width="320" height="140"></canvas>
+          <div class="row" style="margin-top:8px">
+            <button id="clearSign" type="button">Bersihkan</button>
+          </div>
+        </div>
+        
+        <div class="position-controls">
+          <div>
+            <label>Posisi Horizontal</label>
+            <select id="posX">
+              <option value="left">Kiri</option>
+              <option value="center">Tengah</option>
+              <option value="right" selected>Kanan</option>
+            </select>
+          </div>
+          <div>
+            <label>Posisi Vertikal</label>
+            <select id="posY">
+              <option value="top">Atas</option>
+              <option value="center">Tengah</option>
+              <option value="bottom" selected>Bawah</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="preview-container">
+          <div class="preview-title">Pratinjau Posisi:</div>
+          <div style="position: relative; height: 120px; border: 1px solid #344055; background: #1a243b; border-radius: 6px;">
+            <div id="positionPreview" style="position: absolute; width: 40px; height: 20px; background: var(--accent); border-radius: 3px;"></div>
+          </div>
+        </div>
+        
+        <button id="btnAnnot">Sisipkan ke PDF</button>
+        <div class="hint">Teks/TTD akan ditempel sesuai posisi yang dipilih.</div>
+      </section>
+    </div>
+
+    <div class="out" id="output"></div>
+
+    <div class="footer">Catatan: Ini versi awal. Beberapa fungsi lanjutan (edit teks PDF per kata, kompres kualitas tinggi, konversi Word/Excel) memerlukan engine tambahan dan akan ditambahkan di versi berikutnya.</div>
+  </div>
+
+<script>
+const { PDFDocument, StandardFonts, rgb } = PDFLib;
+
+function byId(id){return document.getElementById(id)}
+function toast(msg, ok=true){
+  const o=byId('output');
+  const span=document.createElement('span');
+  span.className='pill '+(ok?'success':'danger');
+  span.textContent=msg; o.prepend(span);
+}
+async function readAsArrayBuffer(file){return new Uint8Array(await file.arrayBuffer())}
+
+function downloadBlob(blob, filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+async function tryShare(blob, filename){
+  if(navigator.canShare && navigator.canShare({ files:[new File([blob], filename, {type: blob.type})]})){
+    try {
+      await navigator.share({
+        files:[new File([blob], filename, {type: blob.type})],
+        title: filename,
+        text: 'Dikirim dari Editor Dokumen Mobile'
+      });
+      toast('Berhasil dibagikan (gunakan WhatsApp di menu share) ✅');
+      return true;
+    } catch(e){ console.log('Share cancel/err', e); }
+  } else {
+    // Fallback: arahkan ke wa.me tanpa file (pengguna bisa lampirkan file dari unduhan)
+    const w = confirm('Perangkat tidak mendukung share file langsung. Unduh dulu lalu kirim via WhatsApp. Buka wa.me sekarang?');
+    if(w){ window.open('https://wa.me/?text=' + encodeURIComponent('Saya telah mengedit dokumen menggunakan Editor Dokumen Mobile. Lihat hasilnya di: https://example.com/editor')); }
+  }
+  return false;
+}
+
+// Update position preview
+function updatePositionPreview() {
+  const posX = byId('posX').value;
+  const posY = byId('posY').value;
+  const preview = byId('positionPreview');
+  
+  // Horizontal position
+  if (posX === 'left') preview.style.left = '10px';
+  else if (posX === 'center') preview.style.left = 'calc(50% - 20px)';
+  else if (posX === 'right') preview.style.right = '10px';
+  
+  // Vertical position
+  if (posY === 'top') preview.style.top = '10px';
+  else if (posY === 'center') preview.style.top = 'calc(50% - 10px)';
+  else if (posY === 'bottom') preview.style.bottom = '10px';
+}
+
+// Initialize position controls
+byId('posX').addEventListener('change', updatePositionPreview);
+byId('posY').addEventListener('change', updatePositionPreview);
+updatePositionPreview();
+
+// 1) MERGE PDFs
+byId('btnMerge').onclick = async () => {
+  const files = byId('mergeFiles').files;
+  if(!files.length){ toast('Pilih file PDF dulu', false); return; }
+  try{
+    const outPdf = await PDFDocument.create();
+    for(const f of files){
+      const bytes = await readAsArrayBuffer(f);
+      const src = await PDFDocument.load(bytes);
+      const copied = await outPdf.copyPages(src, src.getPageIndices());
+      copied.forEach(p=>outPdf.addPage(p));
+    }
+    const outBytes = await outPdf.save();
+    const blob = new Blob([outBytes], {type:'application/pdf'});
+    downloadBlob(blob, 'merged.pdf');
+    await tryShare(blob, 'merged.pdf');
+    toast('Selesai gabung: merged.pdf');
+  }catch(e){ console.error(e); toast('Gagal menggabungkan PDF', false); }
+}
+
+// 2) EXTRACT pages
+function parseRanges(str){
+  const out = new Set();
+  str.split(',').map(s=>s.trim()).forEach(part=>{
+    if(!part) return;
+    if(part.includes('-')){
+      const [a,b] = part.split('-').map(n=>parseInt(n.trim(),10));
+      if(Number.isFinite(a) && Number.isFinite(b)){
+        for(let i=Math.min(a,b); i<=Math.max(a,b); i++) out.add(i);
+      }
+    } else {
+      const n = parseInt(part,10); if(Number.isFinite(n)) out.add(n);
+    }
+  });
+  return Array.from(out).sort((x,y)=>x-y);
+}
+
+byId('btnExtract').onclick = async () => {
+  const f = byId('extractFile').files[0];
+  const rangeStr = byId('range').value.trim();
+  if(!f || !rangeStr){ toast('Pilih file & masukkan rentang halaman', false); return; }
+  try{
+    const bytes = await readAsArrayBuffer(f);
+    const src = await PDFDocument.load(bytes);
+    const wants = parseRanges(rangeStr).map(n=>n-1).filter(i=>i>=0 && i<src.getPageCount());
+    if(!wants.length){ toast('Rentang tidak valid', false); return; }
+    const outPdf = await PDFDocument.create();
+    const copied = await outPdf.copyPages(src, wants);
+    copied.forEach(p=>outPdf.addPage(p));
+    const outBytes = await outPdf.save();
+    const blob = new Blob([outBytes], {type:'application/pdf'});
+    downloadBlob(blob, 'extracted.pdf');
+    await tryShare(blob, 'extracted.pdf');
+    toast('Selesai ekstrak: extracted.pdf');
+  }catch(e){ console.error(e); toast('Gagal ekstraksi', false); }
+}
+
+// 3) Images → PDF
+const PAPER_SIZES = {
+  A4: {w:595.28, h:841.89}, // pt (1pt = 1/72 inch)
+  Letter: {w:612, h:792}
+};
+byId('btnImg2Pdf').onclick = async () => {
+  const files = Array.from(byId('imgFiles').files||[]);
+  if(!files.length){ toast('Pilih gambar dulu', false); return; }
+  const paper = byId('paper').value;
+  const orient = byId('orient').value;
+  const base = PAPER_SIZES[paper];
+  const pageW = orient==='portrait'?base.w:base.h;
+  const pageH = orient==='portrait'?base.h:base.w;
+  try{
+    const pdf = await PDFDocument.create();
+    for(const f of files){
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let img, iw, ih;
+      if(f.type.includes('png')){ img = await pdf.embedPng(bytes); iw=img.width; ih=img.height; }
+      else { img = await pdf.embedJpg(bytes); iw=img.width; ih=img.height; }
+      const page = pdf.addPage([pageW, pageH]);
+      const margin = 24; const maxW = pageW - margin*2; const maxH = pageH - margin*2;
+      let w = maxW, h = iw? (maxW*ih/iw) : maxH;
+      if(h>maxH){ h=maxH; w = (iw? (maxH*iw/ih):maxW); }
+      const x = (pageW - w)/2, y = (pageH - h)/2;
+      page.drawImage(img, {x,y,width:w,height:h});
+    }
+    const outBytes = await pdf.save();
+    const blob = new Blob([outBytes], {type:'application/pdf'});
+    downloadBlob(blob, 'scanned.pdf');
+    await tryShare(blob, 'scanned.pdf');
+    toast('Selesai buat PDF dari gambar: scanned.pdf');
+  }catch(e){ console.error(e); toast('Gagal gambar→PDF', false); }
+}
+
+// 4) Add Text / Signature with position control
+// simple pen pad
+(function(){
+  const pad = byId('signPad');
+  const ctx = pad.getContext('2d');
+  ctx.lineWidth = 2; ctx.lineCap='round';
+  let drawing=false, last=null;
+  function pos(e){
+    const r = pad.getBoundingClientRect();
+    const t = (e.touches? e.touches[0]: e); return {x:(t.clientX - r.left), y:(t.clientY - r.top)};
+  }
+  function start(e){ drawing=true; last=pos(e); }
+  function move(e){ if(!drawing) return; const p=pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; e.preventDefault(); }
+  function end(){ drawing=false; }
+  pad.addEventListener('mousedown', start); pad.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  pad.addEventListener('touchstart', start, {passive:false}); pad.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
+  byId('clearSign').onclick = ()=>{ ctx.clearRect(0,0,pad.width,pad.height); };
+})();
+
+byId('btnAnnot').onclick = async () => {
+  const f = byId('annotFile').files[0];
+  const text = byId('txtAnnot').value.trim();
+  if(!f){ toast('Pilih file PDF', false); return; }
+  try{
+    const bytes = await readAsArrayBuffer(f);
+    const pdf = await PDFDocument.load(bytes);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const pages = pdf.getPages();
+    const first = pages[0];
+    const { width, height } = first.getSize();
+
+    // Get position values
+    const posX = byId('posX').value;
+    const posY = byId('posY').value;
+    const margin = 24;
+
+    // Calculate text position
+    let textX = margin;
+    let textY = margin;
+    
+    if (posX === 'center') textX = width / 2;
+    else if (posX === 'right') textX = width - margin;
+    
+    if (posY === 'center') textY = height / 2;
+    else if (posY === 'bottom') textY = height - margin - 50;
+
+    // draw text (optional)
+    if(text){
+      const size = 12;
+      const textWidth = font.widthOfTextAtSize(text, size);
+      
+      // Adjust for center/right alignment
+      if (posX === 'center') textX -= textWidth / 2;
+      else if (posX === 'right') textX -= textWidth;
+      
+      first.drawText(text, { 
+        x: Math.max(margin, Math.min(textX, width - textWidth - margin)), 
+        y: Math.max(margin + 20, Math.min(textY, height - margin)), 
+        size, 
+        font, 
+        color: rgb(0,0,0) 
+      });
+    }
+
+    // draw signature image from canvas (optional)
+    const pad = byId('signPad');
+    const hasSign = (function(){
+      const t=document.createElement('canvas'); t.width=pad.width; t.height=pad.height; const c=t.getContext('2d');
+      c.drawImage(pad,0,0); const d1=c.getImageData(0,0,t.width,t.height).data; let nonWhite=false; for(let i=0;i<d1.length;i+=4){ if(!(d1[i]>250 && d1[i+1]>250 && d1[i+2]>250)) {nonWhite=true;break;} }
+      return nonWhite;
+    })();
+    
+    if(hasSign){
+      const dataUrl = pad.toDataURL('image/png');
+      const pngBytes = Uint8Array.from(atob(dataUrl.split(',')[1]), c=>c.charCodeAt(0));
+      const img = await pdf.embedPng(pngBytes);
+      const targetW = 140, targetH = 60; // ukuran tanda tangan
+      
+      // Calculate signature position
+      let signX = margin;
+      let signY = margin;
+      
+      if (posX === 'center') signX = (width - targetW) / 2;
+      else if (posX === 'right') signX = width - targetW - margin;
+      
+      if (posY === 'center') signY = (height - targetH) / 2;
+      else if (posY === 'bottom') signY = height - targetH - margin;
+      
+      first.drawImage(img, { 
+        x: Math.max(margin, Math.min(signX, width - targetW - margin)), 
+        y: Math.max(margin, Math.min(signY, height - targetH - margin)), 
+        width: targetW, 
+        height: targetH 
+      });
+    }
+
+    const outBytes = await pdf.save();
+    const blob = new Blob([outBytes], {type:'application/pdf'});
+    downloadBlob(blob, 'annotated.pdf');
+    await tryShare(blob, 'annotated.pdf');
+    toast('Selesai menambahkan teks/ttd: annotated.pdf');
+  }catch(e){ console.error(e); toast('Gagal anotasi', false); }
+}
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("Service Worker registered"))
+        .catch(err => console.error("SW registration failed:", err));
+    }
+  </script>
+</body>
+</html>

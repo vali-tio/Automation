@@ -1,6 +1,6 @@
 {
-  "name": "Automation Lite",
-  "short_name": "Auto",
+  "name": "Edit Dokumen",
+  "short_name": "EditPdf",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
