@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Editor Dokumen – Mobile</title>
+ <link rel="manifest" href="manifest.webmanifest">
   <style>
     :root{--bg:#0f172a;--card:#111827;--muted:#94a3b8;--accent:#22c55e;--text:#e5e7eb}
     *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Noto Sans",sans-serif;background:var(--bg);color:var(--text)}
@@ -521,6 +522,11 @@ byId('btnAnnot').onclick = async () => {
     toast('Selesai menambahkan teks/ttd: annotated.pdf');
   }catch(e){ console.error(e); toast('Gagal anotasi', false); }
 }
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("Service Worker registered"))
+        .catch(err => console.error("SW registration failed:", err));
+    }
 </script>
 </body>
 </html>
