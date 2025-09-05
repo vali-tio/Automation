@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Editor Dokumen – Mobile</title>
-   <link rel="manifest" href="manifest.webmanifest">
   <style>
     :root{--bg:#0f172a;--card:#111827;--muted:#94a3b8;--accent:#22c55e;--text:#e5e7eb}
     *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Noto Sans",sans-serif;background:var(--bg);color:var(--text)}
@@ -34,6 +33,9 @@
     .position-controls label {font-size: 12px;}
     .preview-container {margin-top: 15px; border: 1px solid #344055; border-radius: 8px; padding: 10px; background: #0b1220;}
     .preview-title {font-size: 13px; margin-bottom: 8px; color: var(--muted);}
+    .import-export {margin-top: 15px; border-top: 1px solid #344055; padding-top: 15px;}
+    .import-export h3 {font-size: 14px; margin-bottom: 10px;}
+    .btn-secondary {background: #3b82f6; margin-top: 8px;}
   </style>
   <!-- pdf-lib untuk manipulasi PDF (CDN) -->
   <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
@@ -130,6 +132,8 @@
           <canvas id="signPad" class="signature" width="320" height="140"></canvas>
           <div class="row" style="margin-top:8px">
             <button id="clearSign" type="button">Bersihkan</button>
+            <button id="importSign" type="button" class="btn-secondary">Import TTD</button>
+            <input type="file" id="importSignFile" accept="image/*" style="display:none">
           </div>
         </div>
         
@@ -145,9 +149,9 @@
           <div>
             <label>Posisi Vertikal</label>
             <select id="posY">
-              <option value="top">Atas</option>
+              <option value="top" selected>Atas</option>
               <option value="center">Tengah</option>
-              <option value="bottom" selected>Bawah</option>
+              <option value="bottom">Bawah</option>
             </select>
           </div>
         </div>
@@ -160,7 +164,18 @@
         </div>
         
         <button id="btnAnnot">Sisipkan ke PDF</button>
-        <div class="hint">Teks/TTD akan ditempel sesuai posisi yang dipilih. (posisi ttd pada preview saat ini posisi terbalik jika pilih atas hasil ttd dibawah) perubahan posisi hanya satu kali jika berulang silahkan reload halaman</div>
+        <div class="hint">Teks/TTD akan ditempel sesuai posisi yang dipilih.</div>
+        
+        <!-- Fitur Import/Export -->
+        <div class="import-export">
+          <h3>Fitur Import/Export</h3>
+          <div class="row">
+            <button id="exportSign" type="button" class="btn-secondary">Export TTD</button>
+            <button id="importImage" type="button" class="btn-secondary">Import Gambar</button>
+            <input type="file" id="importImageFile" accept="image/*" style="display:none">
+          </div>
+          <div class="hint">Export tanda tangan sebagai PNG atau import gambar untuk ditambahkan ke PDF.</div>
+        </div>
       </section>
     </div>
 
@@ -218,10 +233,17 @@ function updatePositionPreview() {
   else if (posX === 'center') preview.style.left = 'calc(50% - 20px)';
   else if (posX === 'right') preview.style.right = '10px';
   
-  // Vertical position
-  if (posY === 'top') preview.style.top = '10px';
-  else if (posY === 'center') preview.style.top = 'calc(50% - 10px)';
-  else if (posY === 'bottom') preview.style.bottom = '10px';
+  // Vertical position - DIPERBAIKI: Sekarang sesuai dengan pilihan
+  if (posY === 'top') {
+    preview.style.top = '10px';
+    preview.style.bottom = 'auto';
+  } else if (posY === 'center') {
+    preview.style.top = 'calc(50% - 10px)';
+    preview.style.bottom = 'auto';
+  } else if (posY === 'bottom') {
+    preview.style.top = 'auto';
+    preview.style.bottom = '10px';
+  }
 }
 
 // Initialize position controls
@@ -321,12 +343,14 @@ byId('btnImg2Pdf').onclick = async () => {
   }catch(e){ console.error(e); toast('Gagal gambar→PDF', false); }
 }
 
-// 4) Add Text / Signature with position control
+// 4) Add Text / Signature with position control - DIPERBAIKI
 // simple pen pad
 (function(){
   const pad = byId('signPad');
   const ctx = pad.getContext('2d');
   ctx.lineWidth = 2; ctx.lineCap='round';
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, pad.width, pad.height);
   let drawing=false, last=null;
   function pos(e){
     const r = pad.getBoundingClientRect();
@@ -337,7 +361,47 @@ byId('btnImg2Pdf').onclick = async () => {
   function end(){ drawing=false; }
   pad.addEventListener('mousedown', start); pad.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
   pad.addEventListener('touchstart', start, {passive:false}); pad.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
-  byId('clearSign').onclick = ()=>{ ctx.clearRect(0,0,pad.width,pad.height); };
+  byId('clearSign').onclick = ()=>{ ctx.fillRect(0,0,pad.width,pad.height); };
+  
+  // Import tanda tangan dari file
+  byId('importSign').onclick = () => byId('importSignFile').click();
+  byId('importSignFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const img = new Image();
+      img.onload = function() {
+        // Clear canvas and draw imported image
+        ctx.fillRect(0, 0, pad.width, pad.height);
+        ctx.drawImage(img, 0, 0, pad.width, pad.height);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  
+  // Export tanda tangan
+  byId('exportSign').onclick = function() {
+    const dataUrl = pad.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'tanda_tangan.png';
+    a.click();
+    toast('Tanda tangan diexport sebagai PNG');
+  };
+  
+  // Import gambar untuk ditambahkan ke PDF
+  byId('importImage').onclick = () => byId('importImageFile').click();
+  byId('importImageFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Simpan file untuk digunakan nanti
+    this.dataset.lastFile = file.name;
+    toast(`Gambar '${file.name}' siap untuk ditambahkan ke PDF`);
+  });
 })();
 
 byId('btnAnnot').onclick = async () => {
@@ -357,15 +421,18 @@ byId('btnAnnot').onclick = async () => {
     const posY = byId('posY').value;
     const margin = 24;
 
-    // Calculate text position
-    let textX = margin;
-    let textY = margin;
+    // Calculate text position - DIPERBAIKI: Sekarang sesuai dengan pilihan
+    let textX, textY;
     
-    if (posX === 'center') textX = width / 2;
+    // Horizontal position
+    if (posX === 'left') textX = margin;
+    else if (posX === 'center') textX = width / 2;
     else if (posX === 'right') textX = width - margin;
     
-    if (posY === 'center') textY = height / 2;
-    else if (posY === 'bottom') textY = height - margin - 50;
+    // Vertical position - DIPERBAIKI: Sekarang sesuai dengan pilihan
+    if (posY === 'top') textY = height - margin - 20; // Atas di PDF adalah y tinggi
+    else if (posY === 'center') textY = height / 2;
+    else if (posY === 'bottom') textY = margin + 20; // Bawah di PDF adalah y rendah
 
     // draw text (optional)
     if(text){
@@ -399,21 +466,51 @@ byId('btnAnnot').onclick = async () => {
       const img = await pdf.embedPng(pngBytes);
       const targetW = 140, targetH = 60; // ukuran tanda tangan
       
-      // Calculate signature position
-      let signX = margin;
-      let signY = margin;
+      // Calculate signature position - DIPERBAIKI: Sekarang sesuai dengan pilihan
+      let signX, signY;
       
-      if (posX === 'center') signX = (width - targetW) / 2;
+      // Horizontal position
+      if (posX === 'left') signX = margin;
+      else if (posX === 'center') signX = (width - targetW) / 2;
       else if (posX === 'right') signX = width - targetW - margin;
       
-      if (posY === 'center') signY = (height - targetH) / 2;
-      else if (posY === 'bottom') signY = height - targetH - margin;
+      // Vertical position - DIPERBAIKI: Sekarang sesuai dengan pilihan
+      if (posY === 'top') signY = height - targetH - margin; // Atas di PDF
+      else if (posY === 'center') signY = (height - targetH) / 2;
+      else if (posY === 'bottom') signY = margin; // Bawah di PDF
       
       first.drawImage(img, { 
         x: Math.max(margin, Math.min(signX, width - targetW - margin)), 
         y: Math.max(margin, Math.min(signY, height - targetH - margin)), 
         width: targetW, 
         height: targetH 
+      });
+    }
+
+    // Import gambar dari file jika ada
+    const importImageFile = byId('importImageFile');
+    if (importImageFile.files.length > 0) {
+      const imageFile = importImageFile.files[0];
+      const imageBytes = new Uint8Array(await imageFile.arrayBuffer());
+      let img;
+      
+      if (imageFile.type.includes('png')) {
+        img = await pdf.embedPng(imageBytes);
+      } else {
+        img = await pdf.embedJpg(imageBytes);
+      }
+      
+      // Tentukan posisi gambar (di tengah halaman)
+      const imgWidth = 200;
+      const imgHeight = (img.height * imgWidth) / img.width;
+      const imgX = (width - imgWidth) / 2;
+      const imgY = (height - imgHeight) / 2;
+      
+      first.drawImage(img, {
+        x: imgX,
+        y: imgY,
+        width: imgWidth,
+        height: imgHeight
       });
     }
 
@@ -424,11 +521,6 @@ byId('btnAnnot').onclick = async () => {
     toast('Selesai menambahkan teks/ttd: annotated.pdf');
   }catch(e){ console.error(e); toast('Gagal anotasi', false); }
 }
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js")
-        .then(() => console.log("Service Worker registered"))
-        .catch(err => console.error("SW registration failed:", err));
-    }
-  </script>
+</script>
 </body>
 </html>
